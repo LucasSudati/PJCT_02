@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#080f1e"><meta name="description" content="WaveLab: laboratório interativo de sinais e amostragem.">
+<title>WaveLab — Laboratório de Sinais</title>
+<style>
+:root{color-scheme:dark;--bg:#080f1e;--panel:#101c30;--edge:#26384f;--text:#edf6ff;--muted:#93a8bf;--blue:#4ea8ff;--green:#56e0bd;--amber:#ffbf69}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 85% 0%,#142d50 0%,var(--bg) 48%);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif;color:var(--text)}
+main{max-width:1250px;margin:auto;padding:36px 22px 56px}header{display:flex;justify-content:space-between;gap:18px;align-items:center;margin-bottom:26px}h1{font-size:clamp(2rem,5vw,3.4rem);line-height:1;margin:6px 0}h2{font-size:1.05rem;margin:0 0 16px}p{color:var(--muted);margin:7px 0}small{color:var(--muted)}.brand{font-weight:750;letter-spacing:.16em;color:var(--green)}.pill{border:1px solid var(--edge);padding:7px 13px;border-radius:30px;color:var(--muted);white-space:nowrap}.layout{display:grid;grid-template-columns:280px 1fr;gap:18px}.card{background:rgba(16,28,48,.91);border:1px solid var(--edge);border-radius:18px;padding:20px;box-shadow:0 12px 42px #0002}.controls{grid-row:span 2}.field{margin-bottom:21px}.field label{display:flex;justify-content:space-between;gap:8px;color:var(--muted);margin-bottom:9px}.field output{color:var(--text);font-weight:700}input[type=range]{width:100%;accent-color:var(--blue);cursor:pointer}select,button{background:#192b45;border:1px solid #365273;border-radius:10px;padding:10px 12px;color:var(--text);font:inherit;width:100%}button{cursor:pointer;font-weight:700}button:hover{border-color:var(--blue)}button.active{background:#123c44;border-color:var(--green)}.actions{display:grid;gap:9px}.charts{display:grid;gap:18px}.chartheading{display:flex;align-items:center;justify-content:space-between;gap:8px}canvas{width:100%;height:230px;display:block}.legend{display:flex;flex-wrap:wrap;gap:16px;font-size:.8rem;color:var(--muted)}.legend i{display:inline-block;width:12px;height:3px;vertical-align:middle;margin-right:6px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:18px 0}.stat{padding:14px;background:#0a1729;border:1px solid var(--edge);border-radius:12px}.stat strong{display:block;font-size:1.35rem}.stat span{font-size:.76rem;color:var(--muted)}.notice{padding:13px 16px;border-left:3px solid var(--green);background:#112b33;color:#b8f3e4;border-radius:8px}.notice.warn{border-color:var(--amber);background:#302619;color:#ffdaac}footer{color:var(--muted);margin-top:25px;font-size:.85rem}@media(max-width:800px){.layout{grid-template-columns:1fr}.controls{grid-row:auto}header{align-items:flex-start;flex-direction:column}.stats{grid-template-columns:1fr}canvas{height:200px}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+</style>
+</head>
+<body><main>
+<header><div><div class="brand">PJCT_02 / EXPERIMENTO 01</div><h1>Wave<span style="color:var(--blue)">Lab</span></h1><p>Explore sinais, amostragem e frequências em tempo real.</p></div><span class="pill">100% local · sem bibliotecas</span></header>
+<div class="layout"><aside class="card controls"><h2>Controles do sinal</h2>
+<div class="field"><label for="wave">Forma de onda</label><select id="wave"><option value="sine">Senoidal</option><option value="square">Quadrada</option><option value="triangle">Triangular</option><option value="saw">Dente de serra</option></select></div>
+<div class="field"><label for="freq">Frequência <output id="freqValue"></output></label><input id="freq" type="range" min="1" max="120" value="12"></div>
+<div class="field"><label for="sample">Taxa de amostragem <output id="sampleValue"></output></label><input id="sample" type="range" min="10" max="250" value="80"></div>
+<div class="field"><label for="amp">Amplitude <output id="ampValue"></output></label><input id="amp" type="range" min="10" max="100" value="80"></div>
+<div class="field"><label for="phase">Fase <output id="phaseValue"></output></label><input id="phase" type="range" min="0" max="360" value="0"></div>
+<div class="actions"><button id="play" aria-pressed="false">▶ Ouvir sinal</button><button id="reset">Restaurar valores</button></div>
+<p><small>O áudio reproduz a forma de onda selecionada. Para torná-lo audível, a frequência de reprodução é multiplicada por 20.</small></p>
+</aside>
+<section class="charts"><div class="card"><div class="chartheading"><h2>Sinal contínuo e amostras</h2><div class="legend"><span><i style="background:#4ea8ff"></i>Sinal</span><span><i style="background:#56e0bd"></i>Amostras</span></div></div><canvas id="signal" role="img" aria-label="Gráfico do sinal contínuo e pontos amostrados"></canvas></div>
+<div class="card"><div class="chartheading"><h2>Espectro das amostras</h2><small>DFT · 256 pontos</small></div><canvas id="spectrum" role="img" aria-label="Espectro de frequência das amostras"></canvas></div></section></div>
+<div class="stats"><div class="stat"><span>Frequência de Nyquist</span><strong id="nyquist"></strong></div><div class="stat"><span>Amostras por ciclo</span><strong id="ratio"></strong></div><div class="stat"><span>Período do sinal</span><strong id="period"></strong></div></div>
+<div id="notice" class="notice" role="status"></div><footer>WaveLab · Projeto educacional de processamento de sinais · Experimente elevar a frequência acima de Nyquist para observar aliasing.</footer>
+</main>
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const state={wave:'sine',freq:12,sample:80,amp:.8,phase:0};
+let audio=null,osc=null,gain=null;
+function waveAt(t){const phase=(state.freq*t+state.phase/360)%1;const p=(phase+1)%1;
+switch(state.wave){case 'square':return Math.sin(2*Math.PI*p)>=0?1:-1;case 'triangle':return 1-4*Math.abs(p-.5);case 'saw':return 2*p-1;default:return Math.sin(2*Math.PI*p)}}
+function sync(){state.wave=$('wave').value;state.freq=+$('freq').value;state.sample=+$('sample').value;state.amp=+$('amp').value/100;state.phase=+$('phase').value;
+$('freqValue').textContent=state.freq+' Hz';$('sampleValue').textContent=state.sample+' Hz';$('ampValue').textContent=Math.round(state.amp*100)+'%';$('phaseValue').textContent=state.phase+'°';
+$('nyquist').textContent=(state.sample/2).toFixed(1)+' Hz';$('ratio').textContent=(state.sample/state.freq).toFixed(2);$('period').textContent=(1000/state.freq).toFixed(1)+' ms';
+const alias=state.freq>=state.sample/2;
+$('notice').className='notice'+(alias?' warn':'');
+$('notice').textContent=alias?'Atenção: o sinal fundamental está na frequência de Nyquist ou acima dela. A amostragem pode gerar aliasing.':'A frequência fundamental está abaixo de Nyquist. Ondas não senoidais ainda podem apresentar aliasing nos harmônicos superiores.';
+draw();updateAudio()}
+function setup(canvas){const dpr=window.devicePixelRatio||1;const rect=canvas.getBoundingClientRect();const w=Math.max(1,rect.width),h=Math.max(1,rect.height);canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);const ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);return {ctx,w,h}}
+function grid(ctx,w,h,xLabel){ctx.clearRect(0,0,w,h);ctx.strokeStyle='#26384f';ctx.lineWidth=1;for(let i=0;i<=8;i++){const x=35+(w-49)*i/8;ctx.beginPath();ctx.moveTo(x,12);ctx.lineTo(x,h-25);ctx.stroke()}for(let i=0;i<=4;i++){const y=12+(h-37)*i/4;ctx.beginPath();ctx.moveTo(35,y);ctx.lineTo(w-14,y);ctx.stroke()}ctx.fillStyle='#93a8bf';ctx.font='11px system-ui';ctx.fillText(xLabel,w-65,h-7)}
+function drawSignal(){const {ctx,w,h}=setup($('signal'));grid(ctx,w,h,'tempo (s)');const left=35,right=w-14,top=12,bottom=h-25,mid=(top+bottom)/2,scale=(bottom-top)*.44;const duration=.25;
+ctx.beginPath();ctx.strokeStyle='#4ea8ff';ctx.lineWidth=2;for(let i=0;i<=1100;i++){const t=duration*i/1100;const x=left+(right-left)*i/1100,y=mid-state.amp*waveAt(t)*scale;i?ctx.lineTo(x,y):ctx.moveTo(x,y)}ctx.stroke();
+ctx.fillStyle='#56e0bd';const count=Math.floor(duration*state.sample);for(let n=0;n<=count;n++){const t=n/state.sample,x=left+(right-left)*t/duration,y=mid-state.amp*waveAt(t)*scale;ctx.beginPath();ctx.arc(x,y,3.6,0,Math.PI*2);ctx.fill()}
+ctx.fillStyle='#93a8bf';ctx.fillText('0',18,mid+4);ctx.fillText('0',left,h-7);ctx.fillText('0.25',right-22,h-7)}
+function drawSpectrum(){const {ctx,w,h}=setup($('spectrum'));grid(ctx,w,h,'Hz');const left=35,right=w-14,top=12,bottom=h-25,N=256,fs=state.sample;const vals=Array.from({length:N},(_,n)=>state.amp*waveAt(n/fs));const bins=N/2;let mags=[];for(let k=0;k<=bins;k++){let re=0,im=0;for(let n=0;n<N;n++){const a=-2*Math.PI*k*n/N;re+=vals[n]*Math.cos(a);im+=vals[n]*Math.sin(a)}mags.push(2*Math.hypot(re,im)/N)}
+const max=Math.max(.01,...mags);const bw=(right-left)/(bins+1);ctx.fillStyle='#56e0bd';for(let k=0;k<=bins;k++){const bar=(mags[k]/max)*(bottom-top)*.92;ctx.fillRect(left+k*bw,bottom-bar,Math.max(1,bw*.75),bar)}
+ctx.fillStyle='#93a8bf';ctx.font='11px system-ui';ctx.fillText('0',left,bottom+15);ctx.fillText((fs/4).toFixed(0),left+(right-left)/2-12,bottom+15);ctx.fillText((fs/2).toFixed(0),right-19,bottom+15)}
+function draw(){drawSignal();drawSpectrum()}
+function updateAudio(){if(!osc||!gain)return;const types={sine:'sine',square:'square',triangle:'triangle',saw:'sawtooth'};osc.type=types[state.wave];osc.frequency.setTargetAtTime(state.freq*20,audio.currentTime,.02);gain.gain.setTargetAtTime(state.amp*.12,audio.currentTime,.02)}
+async function stopAudio(){if(!audio)return;try{await audio.close()}catch(e){}audio=null;osc=null;gain=null;$('play').textContent='▶ Ouvir sinal';$('play').classList.remove('active');$('play').setAttribute('aria-pressed','false')}
+$('play').addEventListener('click',async()=>{if(audio){await stopAudio();return}try{const AudioContext=window.AudioContext||window.webkitAudioContext;if(!AudioContext)throw Error('Web Audio indisponível');audio=new AudioContext();osc=audio.createOscillator();gain=audio.createGain();osc.connect(gain);gain.connect(audio.destination);updateAudio();osc.start();await audio.resume();$('play').textContent='■ Parar áudio';$('play').classList.add('active');$('play').setAttribute('aria-pressed','true')}catch(e){await stopAudio();$('notice').textContent='Não foi possível iniciar o áudio neste navegador.'}});
+for(const id of ['wave','freq','sample','amp','phase'])$(id).addEventListener('input',sync);
+$('reset').addEventListener('click',()=>{$('wave').value='sine';$('freq').value=12;$('sample').value=80;$('amp').value=80;$('phase').value=0;sync()});
+window.addEventListener('resize',draw);document.addEventListener('visibilitychange',()=>{if(document.hidden&&audio)stopAudio()});sync();
+</script></body></html>
