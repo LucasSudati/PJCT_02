@@ -9,8 +9,8 @@ Laboratório de sinais e sistemas. As etapas são incrementais e devem preservar
 - [ ] Publicação GitHub Pages e validação mobile.
 
 ## P1 — Processamento digital
-- [ ] FFT radix-2, benchmark e comparação com a DFT direta.
-- [ ] Filtros FIR: média móvel, resposta ao impulso e espectro.
+- [x] FFT radix-2 com 256–2048 pontos e visualização de espectro; benchmark/comparação direta ainda pendentes.
+- [x] Filtro FIR de média móvel aplicado ao sinal, com comparação temporal e espectral; resposta ao impulso dedicada pendente.
 - [ ] Filtros IIR: passa-baixas e passa-altas, coeficientes e estabilidade.
 - [ ] Convolução animada e equações associadas.
 
