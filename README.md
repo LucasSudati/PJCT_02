@@ -2,6 +2,12 @@
 
 Laboratório interativo de sinais e amostragem, desenvolvido em HTML, CSS e JavaScript puro.
 
+## Módulos
+
+- **Fourier (DFT):** [abrir laboratório de sinais](./index.html) — análise espectral já implementada em JavaScript.
+- **Transformada Z:** [abrir laboratório de sistemas digitais](./z.html) — plano Z, polo/zero, estabilidade e respostas de um filtro causal de primeira ordem.
+- **Laplace (planejado):** adicionar plano S, polos e zeros, região de convergência e respostas de sistemas contínuos, incluindo exemplos RLC. Ainda não implementado.
+
 ## Funcionalidades
 
 - Geração de ondas senoidais, quadradas, triangulares e dente de serra.
@@ -15,7 +21,7 @@ Laboratório interativo de sinais e amostragem, desenvolvido em HTML, CSS e Java
 
 ## Executar
 
-Abra o arquivo `index.html` em um navegador moderno. Não é necessário instalar pacotes ou iniciar um servidor.
+Abra o arquivo `index.html` (Fourier) ou `z.html` (Transformada Z) em um navegador moderno. Não é necessário instalar pacotes ou iniciar um servidor.
 
 Também é possível publicar o projeto no GitHub Pages selecionando a branch `main` e a pasta `/ (root)` em **Settings → Pages**.
 
