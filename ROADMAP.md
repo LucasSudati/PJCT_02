@@ -15,7 +15,7 @@ Laboratório de sinais e sistemas. As etapas são incrementais e devem preservar
 - [ ] Convolução animada e equações associadas.
 
 ## P2 — Sistemas e transformadas
-- [ ] Editor de polos e zeros arrastáveis no plano Z.
+- [x] Editor de pares conjugados de polos e zeros arrastáveis no plano Z, com análise de estabilidade e respostas (pole-zero.html).
 - [ ] Transformada de Laplace: plano S, região de convergência, polos e zeros.
 - [ ] Circuitos RLC: resposta temporal e em frequência.
 - [ ] Painel lado a lado Fourier, Z e Laplace.
