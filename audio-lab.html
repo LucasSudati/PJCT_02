@@ -9,6 +9,19 @@
 <label>Processamento do retorno <select id="mode"><option value="direct">Direto (sem filtro)</option><option value="lowpass">Passa-baixas</option><option value="highpass">Passa-altas</option><option value="rc">Simulador RC (circuito físico)</option></select></label>
 <label>Frequência de corte: <output id="cutoffValue">1000 Hz</output><input id="cutoff" type="range" min="100" max="6000" value="1000" step="50"></label>
 <label>Volume do retorno: <output id="volumeValue">0%</output><input id="volume" type="range" min="0" max="100" value="0"></label>
+<section style="border-top:1px solid #365273;margin-top:18px;padding-top:8px"><h2>Pré-amplificação digital</h2>
+<label>Ganho da entrada: <output id="inputGainValue">0 dB</output><input id="inputGain" type="range" min="-12" max="24" step="1" value="0"></label>
+<p><small>Ganho digital aplicado antes dos filtros. Não recupera detalhes perdidos pelo sensor. Para testar, começa em 0 dB e sobe aos poucos.</small></p>
+<h2>Mixer · áudio original e processado</h2>
+<label>Sinal original: <output id="dryValue">0%</output><input id="dry" type="range" min="0" max="100" value="0"></label>
+<label>Sinal filtrado: <output id="wetValue">100%</output><input id="wet" type="range" min="0" max="100" value="100"></label>
+<p><small>Com 100% filtrado e 0% original, escuta somente o processamento. Somar os dois sinais pode elevar o nível e gerar cancelamentos de fase.</small></p>
+<h2>Equalizador de três bandas</h2>
+<label>Graves (200 Hz): <output id="bassValue">0 dB</output><input id="bass" type="range" min="-12" max="12" value="0"></label>
+<label>Médios (1.8 kHz): <output id="midValue">0 dB</output><input id="mid" type="range" min="-12" max="12" value="0"></label>
+<label>Agudos (4 kHz): <output id="trebleValue">0 dB</output><input id="treble" type="range" min="-12" max="12" value="0"></label>
+<button type="button" id="resetMix">Restaurar mixer, ganho e equalizador</button>
+<p id="clip" role="status" aria-live="polite">Pico após ganho: —</p></section>
 <p id="status" class="status" role="status" aria-live="polite">Microfone desligado.</p>
 <p><small>O retorno é opcional. Os gráficos funcionam sem reproduzir áudio. Escolhe primeiro o laringofone como entrada nas configurações de som do computador, ou na lista acima.</small></p></section>
 <section class="card" id="rcSection"><h2>Simulador de circuito RC · retorno em tempo real</h2>
@@ -28,14 +41,36 @@
 </main><script>
 'use strict';
 const $=id=>document.getElementById(id);
-let ctx,stream,source,analyser,filter,gain,returnEnabled=false,frame=0,frequencyData,timeData;
+let ctx,stream,source,analyser,filter,gain,inputGain,dryGain,wetGain,bassEQ,midEQ,trebleEQ,returnEnabled=false,frame=0,frequencyData,timeData;
 function status(s){$('status').textContent=s}
 async function devices(){if(!navigator.mediaDevices?.enumerateDevices)return;try{const list=await navigator.mediaDevices.enumerateDevices();const old=$('device').value;$('device').replaceChildren(new Option('Microfone padrão',''));for(const d of list.filter(d=>d.kind==='audioinput'))$('device').add(new Option(d.label||'Entrada de áudio '+($('device').length),d.deviceId));$('device').value=[...$('device').options].some(o=>o.value===old)?old:''}catch(e){}}
-function route(){if(!ctx||!source)return;try{source.disconnect();filter.disconnect();gain.disconnect()}catch(e){}source.connect(analyser);if($('mode').value==='direct')source.connect(gain);else{if($('mode').value==='rc'){const cutoff=Math.max(1,Math.min(ctx.sampleRate*.49,rcFrequency()));const k=Math.tan(Math.PI*cutoff/ctx.sampleRate),den=1+k,high=$('rcType').value==='highpass';const b=high?[1/den,-1/den]:[k/den,k/den],a=[1,(k-1)/den];filter=ctx.createIIRFilter(b,a)}else{filter=ctx.createBiquadFilter();filter.type=$('mode').value;filter.frequency.value=+$('cutoff').value}source.connect(filter);filter.connect(gain)}if(returnEnabled)gain.connect(ctx.destination);gain.gain.value=returnEnabled?Math.pow(+$('volume').value/100,2)*.5:0}
-async function stop(){cancelAnimationFrame(frame);returnEnabled=false;$('volume').value=0;$('volumeValue').textContent='0%';if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}if(ctx){try{await ctx.close()}catch(e){}ctx=null}source=null;analyser=null;filter=null;gain=null;$('start').disabled=false;$('stop').disabled=true;$('monitor').disabled=true;$('monitor').textContent='Ativar retorno de áudio';$('bar').style.width='0%';$('rms').textContent='—';$('peak').textContent='—';$('rate').textContent='—';status('Microfone desligado.')}
-async function start(){if(!navigator.mediaDevices?.getUserMedia){status('Acesso ao microfone indisponível. Usa HTTPS ou localhost e um navegador compatível.');return}await stop();$('start').disabled=true;try{stream=await navigator.mediaDevices.getUserMedia({audio:{deviceId:$('device').value?{exact:$('device').value}:undefined,echoCancellation:false,noiseSuppression:false,autoGainControl:false},video:false});const AC=window.AudioContext||window.webkitAudioContext;ctx=new AC();await ctx.resume();source=ctx.createMediaStreamSource(stream);analyser=ctx.createAnalyser();analyser.fftSize=2048;analyser.smoothingTimeConstant=.7;filter=ctx.createBiquadFilter();gain=ctx.createGain();gain.gain.value=0;timeData=new Float32Array(analyser.fftSize);frequencyData=new Uint8Array(analyser.frequencyBinCount);route();$('stop').disabled=false;$('monitor').disabled=false;$('rate').textContent=ctx.sampleRate+' Hz';status('Captando áudio. Retorno desligado por segurança.');stream.getAudioTracks()[0].addEventListener('ended',()=>stop(),{once:true});await devices();draw()}catch(e){await stop();status('Não foi possível abrir o microfone: '+e.message+' (verifica as permissões e o dispositivo).')}}
+function dbGain(db){return Math.pow(10,Number(db)/20)}
+function updateMixer(){if(!ctx)return;
+inputGain.gain.setTargetAtTime(dbGain($('inputGain').value),ctx.currentTime,.01);
+dryGain.gain.setTargetAtTime(+$('dry').value/100,ctx.currentTime,.01);
+wetGain.gain.setTargetAtTime(+$('wet').value/100,ctx.currentTime,.01);
+bassEQ.gain.setTargetAtTime(+$('bass').value,ctx.currentTime,.01);
+midEQ.gain.setTargetAtTime(+$('mid').value,ctx.currentTime,.01);
+trebleEQ.gain.setTargetAtTime(+$('treble').value,ctx.currentTime,.01);
+}
+function route(){if(!ctx||!source)return;
+for(const node of [source,inputGain,filter,bassEQ,midEQ,trebleEQ,dryGain,wetGain,gain])try{node?.disconnect()}catch(e){}
+source.connect(inputGain);inputGain.connect(analyser);
+inputGain.connect(dryGain);dryGain.connect(gain);
+if($('mode').value==='rc'){
+const fc=Math.max(1,Math.min(ctx.sampleRate*.49,rcFrequency()));
+const k=Math.tan(Math.PI*fc/ctx.sampleRate),den=1+k,high=$('rcType').value==='highpass';
+filter=ctx.createIIRFilter(high?[1/den,-1/den]:[k/den,k/den],[1,(k-1)/den]);
+}else{filter=ctx.createBiquadFilter();filter.type=$('mode').value==='direct'?'allpass':$('mode').value;filter.frequency.value=+$('cutoff').value}
+inputGain.connect(filter);filter.connect(bassEQ);bassEQ.connect(midEQ);midEQ.connect(trebleEQ);trebleEQ.connect(wetGain);wetGain.connect(gain);
+if(returnEnabled)gain.connect(ctx.destination);
+gain.gain.value=returnEnabled?Math.pow(+$('volume').value/100,2)*.5:0;
+updateMixer();
+}
+async function stop(){cancelAnimationFrame(frame);returnEnabled=false;$('volume').value=0;$('volumeValue').textContent='0%';if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}if(ctx){try{await ctx.close()}catch(e){}ctx=null}source=null;analyser=null;filter=null;gain=null;inputGain=null;dryGain=null;wetGain=null;bassEQ=null;midEQ=null;trebleEQ=null;$('start').disabled=false;$('stop').disabled=true;$('monitor').disabled=true;$('monitor').textContent='Ativar retorno de áudio';$('bar').style.width='0%';$('rms').textContent='—';$('peak').textContent='—';$('rate').textContent='—';status('Microfone desligado.')}
+async function start(){if(!navigator.mediaDevices?.getUserMedia){status('Acesso ao microfone indisponível. Usa HTTPS ou localhost e um navegador compatível.');return}await stop();$('start').disabled=true;try{stream=await navigator.mediaDevices.getUserMedia({audio:{deviceId:$('device').value?{exact:$('device').value}:undefined,echoCancellation:false,noiseSuppression:false,autoGainControl:false},video:false});const AC=window.AudioContext||window.webkitAudioContext;ctx=new AC();await ctx.resume();source=ctx.createMediaStreamSource(stream);analyser=ctx.createAnalyser();analyser.fftSize=2048;analyser.smoothingTimeConstant=.7;filter=ctx.createBiquadFilter();gain=ctx.createGain();inputGain=ctx.createGain();dryGain=ctx.createGain();wetGain=ctx.createGain();bassEQ=ctx.createBiquadFilter();bassEQ.type='lowshelf';bassEQ.frequency.value=200;midEQ=ctx.createBiquadFilter();midEQ.type='peaking';midEQ.frequency.value=1800;midEQ.Q.value=1;trebleEQ=ctx.createBiquadFilter();trebleEQ.type='highshelf';trebleEQ.frequency.value=4000;gain.gain.value=0;timeData=new Float32Array(analyser.fftSize);frequencyData=new Uint8Array(analyser.frequencyBinCount);route();$('stop').disabled=false;$('monitor').disabled=false;$('rate').textContent=ctx.sampleRate+' Hz';status('Captando áudio. Retorno desligado por segurança.');stream.getAudioTracks()[0].addEventListener('ended',()=>stop(),{once:true});await devices();draw()}catch(e){await stop();status('Não foi possível abrir o microfone: '+e.message+' (verifica as permissões e o dispositivo).')}}
 function canvas(id){const el=$(id),rect=el.getBoundingClientRect(),dpr=devicePixelRatio||1,w=rect.width,h=rect.height;el.width=Math.round(w*dpr);el.height=Math.round(h*dpr);const c=el.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,w,h);c.strokeStyle='#26384f';c.beginPath();c.moveTo(0,h/2);c.lineTo(w,h/2);c.stroke();return {c,w,h}}
-function draw(){if(!analyser)return;analyser.getFloatTimeDomainData(timeData);analyser.getByteFrequencyData(frequencyData);let sum=0,peak=0;for(const v of timeData){sum+=v*v;peak=Math.max(peak,Math.abs(v))}const rms=Math.sqrt(sum/timeData.length);$('rms').textContent=(20*Math.log10(Math.max(rms,1e-7))).toFixed(1)+' dBFS';$('peak').textContent=(20*Math.log10(Math.max(peak,1e-7))).toFixed(1)+' dBFS';$('bar').style.width=(Math.min(1,rms*3)*100)+'%';
+function draw(){if(!analyser)return;analyser.getFloatTimeDomainData(timeData);analyser.getByteFrequencyData(frequencyData);let sum=0,peak=0;for(const v of timeData){sum+=v*v;peak=Math.max(peak,Math.abs(v))}const rms=Math.sqrt(sum/timeData.length);$('rms').textContent=(20*Math.log10(Math.max(rms,1e-7))).toFixed(1)+' dBFS';$('peak').textContent=(20*Math.log10(Math.max(peak,1e-7))).toFixed(1)+' dBFS';$('bar').style.width=(Math.min(1,rms*3)*100)+'%';$('clip').textContent='Pico após ganho: '+(20*Math.log10(Math.max(peak,1e-7))).toFixed(1)+' dBFS'+(peak>=.98?' — ATENÇÃO: próximo de saturação!':'');$('clip').style.color=peak>=.98?'#ffbf69':'#a9bdd1';
 let g=canvas('wave');g.c.strokeStyle='#4ea8ff';g.c.lineWidth=2;g.c.beginPath();timeData.forEach((v,i)=>{const x=i*g.w/(timeData.length-1),y=g.h/2-v*g.h*.45;i?g.c.lineTo(x,y):g.c.moveTo(x,y)});g.c.stroke();
 g=canvas('spectrum');g.c.fillStyle='#56e0bd';const bars=90,limit=Math.min(frequencyData.length,Math.round(8000*analyser.fftSize/ctx.sampleRate));for(let i=0;i<bars;i++){const a=Math.floor(i*limit/bars),b=Math.max(a+1,Math.floor((i+1)*limit/bars));let level=0;for(let j=a;j<b;j++)level=Math.max(level,frequencyData[j]);const x=i*g.w/bars,h=level/255*g.h;g.c.fillRect(x,g.h-h,g.w/bars-1,h)}g.c.fillStyle='#a9bdd1';g.c.font='12px sans-serif';g.c.fillText('0 Hz',6,16);g.c.fillText('≈ 8 kHz',Math.max(0,g.w-65),16);frame=requestAnimationFrame(draw)}
 $('start').onclick=start;$('stop').onclick=stop;
@@ -55,5 +90,7 @@ function drawRC(){const {c,w,h}=canvas('rcGraph');const high=$('rcType').value==
 for(const id of ['rcR','rcC','rcType'])$(id).addEventListener('input',updateRC);
 $('rcPresetLow').onclick=()=>{$('rcType').value='lowpass';$('rcR').value=3300;$('rcC').value=10;updateRC()};
 $('rcPresetHigh').onclick=()=>{$('rcType').value='highpass';$('rcR').value=10000;$('rcC').value=100;updateRC()};
+for(const id of ['inputGain','dry','wet','bass','mid','treble'])$(id).addEventListener('input',()=>{$(id+'Value').textContent=$(id).value+(id==='dry'||id==='wet'?'%':' dB');updateMixer()});
+$('resetMix').onclick=()=>{for(const [id,v] of Object.entries({inputGain:0,dry:0,wet:100,bass:0,mid:0,treble:0})){$(id).value=v;$(id+'Value').textContent=v+(id==='dry'||id==='wet'?'%':' dB')}updateMixer()};
 window.addEventListener('resize',drawRC);updateRC();
 </script></body></html>
