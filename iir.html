@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>WaveLab | Filtros IIR</title>
+<style>
+:root{color-scheme:dark;font:15px/1.55 system-ui,sans-serif;background:#08101e;color:#eaf5ff}*{box-sizing:border-box}
+body{margin:0;padding:24px;background:radial-gradient(circle at 85% 0,#153654,#08101e 55%)}
+main{max-width:1160px;margin:auto}a{color:#6fb8ff}h1{font-size:clamp(1.8rem,4vw,2.8rem);margin:12px 0}p{color:#aebfd0}
+.layout{display:grid;grid-template-columns:280px 1fr;gap:18px}.card{background:#111e30;border:1px solid #293f58;border-radius:15px;padding:20px;margin:14px 0}
+label{display:block;margin:16px 0;color:#bfd0e0}select,input{display:block;width:100%;padding:9px;margin-top:7px;background:#1b3049;color:white;border:1px solid #3a5b77;border-radius:8px}input{accent-color:#5faeff}
+output{float:right;color:#66e7c4}canvas{width:100%;height:220px;display:block}code{color:#69dfbd}
+.metric{padding:12px;background:#0c192b;border-radius:10px;margin-bottom:10px}.metric strong{display:block;font-size:1.2rem}.metric small{color:#9cb4c9}
+.legend{font-size:.85rem;color:#9fb1c6}#status{color:#7de3c4}@media(max-width:780px){.layout{grid-template-columns:1fr}}
+</style></head><body><main><a href="./index.html">← Voltar ao WaveLab</a><h1>Filtros IIR</h1><p>Compare filtros digitais causais de primeira ordem. Os coeficientes, a resposta temporal, a resposta em frequência e o polo mudam conforme os controles.</p>
+<div class="layout"><aside><section class="card"><h2>Configuração</h2>
+<label for="type">Tipo de filtro<select id="type"><option value="low">Passa-baixas</option><option value="high">Passa-altas</option></select></label>
+<label for="cutoff">Frequência de corte aproximada <output id="cv"></output><input id="cutoff" type="range" min="2" max="100" value="25" step="1"></label>
+<label for="noise">Intensidade do ruído <output id="nv"></output><input id="noise" type="range" min="0" max="100" value="15"></label>
+<p>Equação implementada:</p><p><code id="eq"></code></p><p><small>Frequência de amostragem fixa: 256 Hz. A transformação do corte em polo usa a aproximação exponencial; o corte efetivo pode diferir do valor do controle.</small></p>
+</section><section class="card"><h2>Parâmetros</h2><div class="metric"><small>Polo real (a)</small><strong id="pole"></strong></div><div class="metric"><small>Coeficientes [b₀,b₁] / [1,a₁]</small><strong id="coeff" style="font-size:.9rem;overflow-wrap:anywhere"></strong></div><p id="status" role="status"></p></section></aside>
+<section><div class="card"><h2>Sinal e saída filtrada</h2><canvas id="wave" role="img" aria-label="Gráfico comparando sinal original e sinal filtrado"></canvas><p class="legend">Azul: entrada · Verde: saída · primeiras 128 amostras</p></div>
+<div class="card"><h2>Resposta em frequência</h2><canvas id="freq" role="img" aria-label="Magnitude da resposta em frequência do filtro"></canvas><p class="legend">Magnitude linear de 0 a 128 Hz; curva avaliada diretamente em H(e^jω).</p></div>
+<div class="card"><h2>Plano Z</h2><canvas id="plane" role="img" aria-label="Polo e zero no plano complexo com círculo unitário"></canvas><p class="legend">× polo · ○ zero · círculo unitário. Polo sempre real e interno ao círculo neste módulo.</p></div></section></div></main>
+<script>
+'use strict';
+const $=id=>document.getElementById(id),FS=256;
+function canvas(id){const e=$(id),b=e.getBoundingClientRect(),d=devicePixelRatio||1;e.width=Math.round(b.width*d);e.height=Math.round(b.height*d);const c=e.getContext('2d');c.setTransform(d,0,0,d,0,0);return[c,b.width,b.height]}
+function frame(c,w,h){c.clearRect(0,0,w,h);c.strokeStyle='#293f58';c.lineWidth=1;for(let j=0;j<=4;j++){const y=12+(h-36)*j/4;c.beginPath();c.moveTo(38,y);c.lineTo(w-10,y);c.stroke()}c.font='12px system-ui';c.fillStyle='#9ab1c6'}
+function plot(c,arr,color,w,h,ymin,ymax){const x0=40,x1=w-12,y0=12,y1=h-25;c.strokeStyle=color;c.lineWidth=1.7;c.beginPath();arr.forEach((v,i)=>{const x=x0+(x1-x0)*i/Math.max(1,arr.length-1),y=y1-(v-ymin)/(ymax-ymin)*(y1-y0);if(i)c.lineTo(x,y);else c.moveTo(x,y)});c.stroke()}
+function transfer(b0,b1,a,omega){const c=Math.cos(omega),s=Math.sin(omega),nr=b0+b1*c,ni=-b1*s,dr=1-a*c,di=a*s;return Math.hypot(nr,ni)/Math.hypot(dr,di)}
+function update(){const type=$('type').value,cutoff=+$('cutoff').value,noise=+$('noise').value/100;
+const a=Math.exp(-2*Math.PI*cutoff/FS),b0=type==='low'?1-a:(1+a)/2,b1=type==='low'?0:-b0;
+$('cv').textContent=cutoff+' Hz';$('nv').textContent=Math.round(noise*100)+'%';$('pole').textContent=a.toFixed(5);$('coeff').textContent='['+b0.toFixed(5)+', '+b1.toFixed(5)+'] / [1, '+(-a).toFixed(5)+']';
+$('eq').textContent='y[n] = '+b0.toFixed(4)+' x[n] '+(b1<0?'− ':'+ ')+Math.abs(b1).toFixed(4)+' x[n−1] + '+a.toFixed(4)+' y[n−1]';
+$('status').textContent='Estável (|a| = '+a.toFixed(3)+' < 1).';
+let x=[],y=[],previousX=0,previousY=0;
+for(let n=0;n<512;n++){let value=Math.sin(2*Math.PI*8*n/FS)+.45*Math.sin(2*Math.PI*70*n/FS)+noise*.6*Math.sin(2*Math.PI*109*n/FS+.7);let output=b0*value+b1*previousX+a*previousY;x.push(value);y.push(output);previousX=value;previousY=output}
+let [c,w,h]=canvas('wave');frame(c,w,h);plot(c,x.slice(0,128),'#64acff',w,h,-2,2);plot(c,y.slice(0,128),'#68e0bc',w,h,-2,2);
+[c,w,h]=canvas('freq');frame(c,w,h);let magnitude=Array.from({length:256},(_,i)=>transfer(b0,b1,a,Math.PI*i/255));plot(c,magnitude,'#68e0bc',w,h,0,1.08);c.fillText('0 Hz',40,h-7);c.fillText('128 Hz',w-60,h-7);
+[c,w,h]=canvas('plane');const radius=Math.min((w-40)/2,(h-28)/2)*.78,cx=w/2,cy=h/2;c.strokeStyle='#42617a';c.beginPath();c.moveTo(cx-radius*1.35,cy);c.lineTo(cx+radius*1.35,cy);c.moveTo(cx,cy-radius*1.2);c.lineTo(cx,cy+radius*1.2);c.stroke();c.strokeStyle='#64acff';c.lineWidth=2;c.beginPath();c.arc(cx,cy,radius,0,2*Math.PI);c.stroke();const z=type==='low'?null:1;const px=cx+a*radius;c.strokeStyle='#ffbd76';c.lineWidth=3;c.beginPath();c.moveTo(px-6,cy-6);c.lineTo(px+6,cy+6);c.moveTo(px-6,cy+6);c.lineTo(px+6,cy-6);c.stroke();if(z!==null){c.strokeStyle='#68e0bc';c.beginPath();c.arc(cx+radius,cy,6,0,2*Math.PI);c.stroke()}c.fillStyle='#9ab1c6';c.fillText('Re',cx+radius*1.15,cy-9);c.fillText('Im',cx+7,cy-radius*1.1);
+}
+for(const id of ['type','cutoff','noise'])$(id).addEventListener('input',update);addEventListener('resize',update);update();
+</script></body></html>
