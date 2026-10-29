@@ -8,6 +8,7 @@ Laboratório interativo de sinais e amostragem, desenvolvido em HTML, CSS e Java
 - **Transformada Z:** [abrir laboratório de sistemas digitais](./z.html) — plano Z, polo/zero, estabilidade e respostas de um filtro causal de primeira ordem.
 - **FFT e filtro FIR:** [abrir laboratório de filtragem](./fft.html) — FFT radix-2 e filtro de média móvel com sinal e espectro comparativos.
 - **Filtros IIR:** [abrir simulador de filtros digitais](./iir.html) — filtros passa-baixas e passa-altas de primeira ordem, equação de diferenças, ganho e plano Z.
+- **Editor de polos e zeros:** [abrir plano Z interativo](./pole-zero.html) — arrastar pares conjugados, observar estabilidade e respostas.
 - **Laplace (planejado):** adicionar plano S, polos e zeros, região de convergência e respostas de sistemas contínuos, incluindo exemplos RLC. Ainda não implementado.
 
 ## Funcionalidades
