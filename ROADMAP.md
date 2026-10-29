@@ -11,7 +11,7 @@ Laboratório de sinais e sistemas. As etapas são incrementais e devem preservar
 ## P1 — Processamento digital
 - [x] FFT radix-2 com 256–2048 pontos e visualização de espectro; benchmark/comparação direta ainda pendentes.
 - [x] Filtro FIR de média móvel aplicado ao sinal, com comparação temporal e espectral; resposta ao impulso dedicada pendente.
-- [ ] Filtros IIR: passa-baixas e passa-altas, coeficientes e estabilidade.
+- [x] Filtros IIR passa-baixas e passa-altas de primeira ordem: coeficientes, equação de diferenças, resposta temporal, ganho e polo (iir.html).
 - [ ] Convolução animada e equações associadas.
 
 ## P2 — Sistemas e transformadas
